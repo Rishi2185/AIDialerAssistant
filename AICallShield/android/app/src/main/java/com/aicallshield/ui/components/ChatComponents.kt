@@ -255,6 +255,7 @@ fun RiskLevelChip(
             labelColor = color,
         ),
         border = AssistChipDefaults.assistChipBorder(
+            enabled = true,
             borderColor = color.copy(alpha = 0.3f),
         )
     )

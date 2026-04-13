@@ -4,9 +4,11 @@ import android.app.Notification
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.os.Build
 import android.os.IBinder
 import android.os.Process
 import android.util.Log
@@ -69,7 +71,15 @@ class AudioProcessingService : Service() {
 
     private fun startForegroundService() {
         val notification = createNotification()
-        startForeground(Constants.SCREENING_NOTIFICATION_ID, notification)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                Constants.SCREENING_NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            )
+        } else {
+            startForeground(Constants.SCREENING_NOTIFICATION_ID, notification)
+        }
     }
 
     private fun createNotification(): Notification {
