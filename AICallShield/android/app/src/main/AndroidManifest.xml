@@ -11,6 +11,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
@@ -24,6 +25,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.AICallShield"
+        android:usesCleartextTraffic="true"
         tools:targetApi="34">
 
         <!-- Main Activity -->
@@ -58,7 +60,7 @@
         <!-- Audio Processing Foreground Service -->
         <service
             android:name=".service.AudioProcessingService"
-            android:foregroundServiceType="phoneCall"
+            android:foregroundServiceType="microphone"
             android:exported="false" />
 
     </application>

@@ -5,8 +5,8 @@ package com.aicallshield.util
  */
 object Constants {
     // Backend API
-    const val BASE_URL = "http://10.0.2.2:8000/"  // Emulator → localhost
-    const val WS_BASE_URL = "ws://10.0.2.2:8000/"
+    const val BASE_URL = "http://192.168.1.9:8000/"  // Emulator → localhost
+    const val WS_BASE_URL = "ws://192.168.1.9:8000/"
     const val API_PREFIX = "api/v1/"
 
     // WebSocket
