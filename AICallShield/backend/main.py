@@ -19,7 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from models.schemas import HealthResponse
-from routers import calls, ai_processing, websocket
+from routers import calls, ai_processing, websocket, twilio
 
 # ── Logging ───────────────────────────────────────────────────────────
 
@@ -65,6 +65,7 @@ app.add_middleware(
 
 app.include_router(calls.router, prefix="/api/v1")
 app.include_router(ai_processing.router, prefix="/api/v1")
+app.include_router(twilio.router, prefix="/api/v1")
 app.include_router(websocket.router)
 
 

@@ -1,6 +1,7 @@
 package com.aicallshield.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -36,14 +37,17 @@ data class ConversationItem(
  * Layout:
  *  1. Top bar with app logo + settings icon
  *  2. Welcome greeting
- *  3. AI Assistant status toggle card
- *  4. "Talk to your assistant / Call Now" hero card
- *  5. Recent conversations list
+ *  3. Setup status card (if default dialer not set)
+ *  4. AI Assistant status toggle card
+ *  5. "Talk to your assistant / Call Now" hero card
+ *  6. Recent conversations list
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     userName: String = "",
+    isDefaultDialer: Boolean = false,
+    onRequestDialerRole: () -> Unit = {},
     onStartDemo: (String) -> Unit,
     onViewHistory: () -> Unit,
     onOpenSettings: () -> Unit = {},
@@ -95,6 +99,16 @@ fun HomeScreen(
         // ── 2. Welcome Greeting ──────────────────────────────────
         item {
             WelcomeSection(displayName = userName.ifBlank { "User" })
+        }
+
+        // ── 2.5. Setup Status Card ───────────────────────────────
+        if (!isDefaultDialer) {
+            item {
+                SetupStatusCard(
+                    isDefaultDialer = isDefaultDialer,
+                    onRequestDialerRole = onRequestDialerRole
+                )
+            }
         }
 
         // ── 3. AI Assistant Toggle Card ──────────────────────────
@@ -176,6 +190,130 @@ fun HomeScreen(
 // ═════════════════════════════════════════════════════════════════
 // Sub-components
 // ═════════════════════════════════════════════════════════════════
+
+/**
+ * Setup status card shown when the app hasn't been set as the default dialer.
+ * This is required for AI call screening to actually work.
+ */
+@Composable
+private fun SetupStatusCard(
+    isDefaultDialer: Boolean,
+    onRequestDialerRole: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .padding(bottom = 12.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFFFFF3E0) // Light orange / warning
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = "⚙️", fontSize = 24.sp)
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "Complete Setup",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Gray900
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "To screen and answer calls automatically, AICallShield needs to be set as your default phone app.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Gray800,
+                lineHeight = 20.sp
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Checklist items
+            SetupCheckItem(
+                label = "Default dialer role",
+                isComplete = isDefaultDialer,
+                description = if (isDefaultDialer) "Active" else "Required to answer calls"
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            if (!isDefaultDialer) {
+                Button(
+                    onClick = onRequestDialerRole,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Orange500
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PhoneInTalk,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Set as Default Dialer",
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SetupCheckItem(
+    label: String,
+    isComplete: Boolean,
+    description: String
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Box(
+            modifier = Modifier
+                .size(24.dp)
+                .clip(CircleShape)
+                .background(if (isComplete) Green500 else Gray200),
+            contentAlignment = Alignment.Center
+        ) {
+            if (isComplete) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        Column {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = if (isComplete) Green700 else Gray800
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (isComplete) Green600 else Orange500
+            )
+        }
+    }
+}
 
 @Composable
 private fun TopBarSection(onOpenSettings: () -> Unit) {

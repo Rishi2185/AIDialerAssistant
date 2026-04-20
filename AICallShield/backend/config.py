@@ -3,10 +3,12 @@ AICallShield Backend Configuration
 """
 
 import os
+from pathlib import Path
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 
-load_dotenv()
+_BACKEND_DIR = Path(__file__).resolve().parent
+load_dotenv(dotenv_path=_BACKEND_DIR / ".env", override=True)
 
 
 class Settings(BaseSettings):

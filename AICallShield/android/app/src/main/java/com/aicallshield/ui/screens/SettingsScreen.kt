@@ -39,6 +39,7 @@ fun SettingsScreen(
     onBack: () -> Unit = {},
     onOpenPersonalDetails: () -> Unit = {},
     onOpenAssistantVoice: () -> Unit = {},
+    onOpenCallForwarding: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
 
@@ -127,6 +128,13 @@ fun SettingsScreen(
             title = "Assistant Voice",
             subtitle = "Select Assistant Voice",
             onClick = onOpenAssistantVoice
+        )
+
+        SettingsRow(
+            icon = Icons.Default.Phone,
+            title = "Call Forwarding Assistant",
+            subtitle = "Set up Twilio forwarding",
+            onClick = onOpenCallForwarding
         )
 
         Spacer(modifier = Modifier.height(16.dp))

@@ -11,6 +11,7 @@ import com.aicallshield.AICallShieldApp
 import com.aicallshield.data.local.LocalCallStore
 import com.aicallshield.data.model.*
 import com.aicallshield.data.repository.CallRepository
+import com.aicallshield.service.AIInCallService
 import com.aicallshield.service.AudioProcessingService
 import com.aicallshield.service.CallSpeechEngine
 import com.aicallshield.service.LocalScreeningEngine
@@ -27,12 +28,14 @@ import java.util.UUID
  *
  * Manages real-time call state, WebSocket communication,
  * chat messages, and spam detection during an active call.
+ *
+ * Wired to [AIInCallService] for real call control (answer/reject/end)
+ * and [CallSpeechEngine] for TTS responses spoken to the caller.
  */
 class CallScreeningViewModel : ViewModel() {
 
     companion object {
         private const val TAG = "CallScreeningVM"
-        private const val ASSISTANT_GREETING = "HI, I AM ASSISTANT. I will screen this call and protect your privacy."
     }
 
     private val repository = CallRepository()
@@ -72,6 +75,73 @@ class CallScreeningViewModel : ViewModel() {
 
     init {
         observeConnectionState()
+        wireInCallServiceListener()
+    }
+
+    // ── InCallService Integration ────────────────────────────────────
+
+    /**
+     * Register a listener on [AIInCallService] so we react to real
+     * telephony events (ringing, answered, ended).
+     */
+    private fun wireInCallServiceListener() {
+        AIInCallService.callLifecycleListener = object : AIInCallService.CallLifecycleListener {
+            override fun onCallRinging(number: String) {
+                Log.i(TAG, "InCallService: ringing from $number")
+                if (_callStatus.value == CallStatus.SCREENING) {
+                    addMessage(
+                        ChatMessage(
+                            id = UUID.randomUUID().toString(),
+                            sender = SenderType.SYSTEM,
+                            text = "📞 Incoming call from $number — ringing…",
+                            timestamp = System.currentTimeMillis()
+                        )
+                    )
+                }
+            }
+
+            override fun onCallAnswered(number: String) {
+                Log.i(TAG, "InCallService: call answered ($number)")
+                addMessage(
+                    ChatMessage(
+                        id = UUID.randomUUID().toString(),
+                        sender = SenderType.SYSTEM,
+                        text = "✅ Call answered. AI is attending the call.",
+                        timestamp = System.currentTimeMillis()
+                    )
+                )
+            }
+
+            override fun onCallEnded(number: String) {
+                Log.i(TAG, "InCallService: call ended ($number)")
+                if (_callStatus.value != CallStatus.ENDED &&
+                    _callStatus.value != CallStatus.BLOCKED
+                ) {
+                    _callStatus.value = CallStatus.ENDED
+                    stopAudioCapture()
+
+                    val summary = generateLocalSummary()
+                    persistCallRecord(CallStatus.ENDED, summary)
+
+                    addMessage(
+                        ChatMessage(
+                            id = UUID.randomUUID().toString(),
+                            sender = SenderType.SYSTEM,
+                            text = "📱 Call ended.",
+                            timestamp = System.currentTimeMillis()
+                        )
+                    )
+                    addMessage(
+                        ChatMessage(
+                            id = UUID.randomUUID().toString(),
+                            sender = SenderType.SYSTEM,
+                            text = "📋 Summary: $summary",
+                            timestamp = System.currentTimeMillis()
+                        )
+                    )
+                }
+            }
+        }
     }
 
     // ── Initialization ───────────────────────────────────────────────
@@ -88,18 +158,6 @@ class CallScreeningViewModel : ViewModel() {
                 timestamp = System.currentTimeMillis()
             )
         )
-
-        addMessage(
-            ChatMessage(
-                id = UUID.randomUUID().toString(),
-                sender = SenderType.AI,
-                text = ASSISTANT_GREETING,
-                timestamp = System.currentTimeMillis(),
-                spamScore = _currentSpamScore.value,
-                riskLevel = _currentRiskLevel.value,
-            )
-        )
-        CallSpeechEngine.speak(AICallShieldApp.appContext, ASSISTANT_GREETING)
 
         callStartTimeMs = System.currentTimeMillis()
         _isLocalMode.value = true
@@ -207,16 +265,19 @@ class CallScreeningViewModel : ViewModel() {
         }
 
         if (!wasLocalMode) {
+            val greeting = "Hello. This call is being screened in local mode. Please do not share OTP, bank, or payment details over a phone call."
             addMessage(
                 ChatMessage(
                     id = UUID.randomUUID().toString(),
-                    sender = SenderType.SYSTEM,
-                    text = "📱 Local mode active. Assistant continues screening with on-device rules.",
+                    sender = SenderType.AI,
+                    text = greeting,
                     timestamp = System.currentTimeMillis(),
                     spamScore = _currentSpamScore.value,
                     riskLevel = _currentRiskLevel.value
                 )
             )
+            // Speak the greeting aloud to the caller via TTS
+            speakToCall(greeting)
         }
     }
 
@@ -244,23 +305,25 @@ class CallScreeningViewModel : ViewModel() {
 
             "ai_reply" -> {
                 _isAIProcessing.value = false
-                val aiText = wsMessage.text ?: ""
+                val replyText = wsMessage.text ?: ""
                 addMessage(
                     ChatMessage(
                         id = UUID.randomUUID().toString(),
                         sender = SenderType.AI,
-                        text = aiText,
+                        text = replyText,
                         timestamp = System.currentTimeMillis(),
                         spamScore = wsMessage.spamScore,
                         riskLevel = parseRiskLevel(wsMessage.riskLevel)
                     )
                 )
-                if (aiText.isNotBlank()) {
-                    CallSpeechEngine.speak(AICallShieldApp.appContext, aiText)
-                }
                 // Update spam score
                 wsMessage.spamScore?.let { _currentSpamScore.value = it }
                 parseRiskLevel(wsMessage.riskLevel)?.let { _currentRiskLevel.value = it }
+
+                // Speak the AI reply to the caller via TTS
+                if (replyText.isNotBlank()) {
+                    speakToCall(replyText)
+                }
             }
 
             "spam_alert" -> {
@@ -319,6 +382,9 @@ class CallScreeningViewModel : ViewModel() {
         if (!_isLocalMode.value) {
             webSocketClient.sendUserJoin()
         }
+
+        // Stop TTS so the user can talk
+        CallSpeechEngine.stop()
 
         addMessage(
             ChatMessage(
@@ -386,7 +452,7 @@ class CallScreeningViewModel : ViewModel() {
 
         _isAIProcessing.value = true
         viewModelScope.launch {
-            delay(220)
+            delay(450)
             val result = localScreeningEngine.evaluate(text, _callerNumber.value)
 
             _currentSpamScore.value = maxOf(_currentSpamScore.value, result.spamScore)
@@ -419,7 +485,10 @@ class CallScreeningViewModel : ViewModel() {
                     riskLevel = result.riskLevel,
                 )
             )
-            CallSpeechEngine.speak(AICallShieldApp.appContext, result.replyText)
+
+            // Speak the AI reply aloud to the caller
+            speakToCall(result.replyText)
+
             _isAIProcessing.value = false
         }
     }
@@ -428,6 +497,7 @@ class CallScreeningViewModel : ViewModel() {
         _callStatus.value = CallStatus.BLOCKED
         stopAudioCapture()
         CallSpeechEngine.stop()
+
         if (!_isLocalMode.value) {
             webSocketClient.sendBlockCaller()
         }
@@ -449,18 +519,25 @@ class CallScreeningViewModel : ViewModel() {
                 timestamp = System.currentTimeMillis()
             )
         )
+
+        // Actually disconnect the call via InCallService
+        AIInCallService.rejectCurrentCall()
     }
 
     fun endCall() {
         _callStatus.value = CallStatus.ENDED
         stopAudioCapture()
         CallSpeechEngine.stop()
+
         if (!_isLocalMode.value) {
             webSocketClient.sendEndCall()
         }
 
         val localSummary = generateLocalSummary()
         persistCallRecord(CallStatus.ENDED, localSummary)
+
+        // Actually disconnect the call via InCallService
+        AIInCallService.endCurrentCall()
 
         if (_isLocalMode.value) {
             addMessage(
@@ -512,6 +589,27 @@ class CallScreeningViewModel : ViewModel() {
             return
         }
         webSocketClient.sendAudio(audioBytes)
+    }
+
+    // ── TTS ──────────────────────────────────────────────────────────
+
+    /**
+     * Speak text aloud through the call audio stream so the caller hears it.
+     * Only speaks if the AI is still screening (not after user joins).
+     */
+    private fun speakToCall(text: String) {
+        if (_callStatus.value == CallStatus.USER_JOINED ||
+            _callStatus.value == CallStatus.ENDED ||
+            _callStatus.value == CallStatus.BLOCKED
+        ) {
+            return
+        }
+
+        try {
+            CallSpeechEngine.speak(AICallShieldApp.appContext, text)
+        } catch (e: Exception) {
+            Log.e(TAG, "TTS speakToCall failed", e)
+        }
     }
 
     // ── Helpers ──────────────────────────────────────────────────────
@@ -652,8 +750,10 @@ class CallScreeningViewModel : ViewModel() {
     override fun onCleared() {
         super.onCleared()
         stopAudioCapture()
-        CallSpeechEngine.shutdown()
+        CallSpeechEngine.stop()
         webSocketMessagesJob?.cancel()
         webSocketClient.destroy()
+        // Clean up InCallService listener to avoid leaks
+        AIInCallService.callLifecycleListener = null
     }
 }

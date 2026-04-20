@@ -88,10 +88,10 @@ class LocalScreeningEngine {
     private fun buildReply(riskLevel: RiskLevel): String {
         return when (riskLevel) {
             RiskLevel.CRITICAL,
-            RiskLevel.HIGH -> "HI, I AM ASSISTANT. For security reasons, this line cannot share OTP, payment, or account details. Please contact the user through an official verified channel."
+            RiskLevel.HIGH -> "For security reasons, this line cannot share OTP, payment, or account details. Please contact the user through an official verified channel."
 
-            RiskLevel.MEDIUM -> "HI, I AM ASSISTANT. Please share your full name, organization, and reason for the call. Sensitive information is not shared on this line."
-            RiskLevel.LOW -> "HI, I AM ASSISTANT. This call is being screened by AICallShield. Please share your name and purpose of the call."
+            RiskLevel.MEDIUM -> "Thanks for calling. Please share your full name, organization, and reason for the call. Sensitive information is not shared on this line."
+            RiskLevel.LOW -> "Hello. This call is being screened by AICallShield. Please share your name and purpose of the call."
         }
     }
 }

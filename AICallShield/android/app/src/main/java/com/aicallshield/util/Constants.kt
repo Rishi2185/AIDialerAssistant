@@ -22,6 +22,7 @@ object Constants {
     const val PREF_SPAM_THRESHOLD = "spam_threshold"
     const val PREF_TTS_VOICE = "tts_voice"
     const val PREF_USER_ID = "user_id"
+    const val PREF_FORWARDING_TWILIO_NUMBER = "forwarding_twilio_number"
 
     // Spam risk thresholds
     const val SPAM_LOW_THRESHOLD = 0.35f
